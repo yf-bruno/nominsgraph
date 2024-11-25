@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+  <title>Global Temperature Graph</title>
+  <style>
+    #temperature-graph {
+      background-color: #f9f9f9;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      width: 80%; /* Set width as a percentage of the parent container */
+      max-width: 1200px; /* Optional: Set a maximum width */
+      height: 500px; /* Fixed height */
+      margin: 20px auto; /* Center the graph horizontally */
+    }
+
+    /* Styling for the Zoom Instruction */
+    #zoom-instruction {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      color: #333;
+      margin-top: 10px;
+    }
+
+    #zoom-instruction .icon {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+      border: 2px dashed #333;
+      position: relative;
+    }
+
+    #zoom-instruction .icon::before {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 8px;
+      height: 8px;
+      border: 2px solid #333;
+    }
+
+    #zoom-instruction .reset {
+      margin-left: 20px;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    /* Styling for the Legend */
+    #legend {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      color: #333;
+      margin-top: 10px;
+    }
+
+    #legend .item {
+      display: flex;
+      align-items: center;
+      margin-right: 20px;
+    }
+
+    #legend .color-box {
+      width: 15px;
+      height: 15px;
+      margin-right: 5px;
+      border: 1px solid #333;
+    }
+
+    #legend .lowess {
+      background-color: black;
+    }
+
+    #legend .mean {
+      background-color: lightgray;
+    }
+
+    /* Pulsating dot */
+    .pulsating-dot {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background-color: red;
+      border-radius: 50%;
+      animation: pulse 1s infinite;
+      pointer-events: none; /* Prevent the dot from interfering with user interactions */
+    }
+
+    /* Pulsating animation */
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: scale(1.5);
+        opacity: 0.5;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+    /* Data source styling */
+    #data-source {
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      color: #666;
+      text-align: center;
+      margin-top: 10px;
+    }
+ 
+  </style>
+</head>
+<body>
+  <div id="temperature-graph"></div>
+
+  <!-- Zoom Instructions -->
+  <div id="zoom-instruction">
+    <div class="icon"></div>
+    <span>Click + Drag to Zoom</span>
+    <span class="reset" onclick="Plotly.relayout('temperature-graph', {xaxis: {autorange: true}, yaxis: {autorange: true}});">Reset</span>
+  </div>
+  <div id="pulsating-dot" class="pulsating-dot" style="display: none;"></div> <!-- Pulsating dot -->
+    <!-- Data source -->
+    <div id="data-source">
+        Data source: NASA's Goddard Institute for Space Studies (GISS). Credit: NASA/GISS
+    </div>
+
+
+  <!-- Include Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script>
+    // JSON data for temperature anomalies
+    const temperatureData = [
+      {"year": 1880, "temperature_anomaly": -0.16},
+      {"year": 1881, "temperature_anomaly": -0.08},
+      {"year": 1882, "temperature_anomaly": -0.10},
+      {"year": 1883, "temperature_anomaly": -0.17},
+      {"year": 1884, "temperature_anomaly": -0.28},
+      {"year": 1885, "temperature_anomaly": -0.31},
+      {"year": 1886, "temperature_anomaly": -0.31},
+      {"year": 1887, "temperature_anomaly": -0.35},
+      {"year": 1888, "temperature_anomaly": -0.23},
+      {"year": 1889, "temperature_anomaly": -0.12},
+      {"year": 1890, "temperature_anomaly": -0.35},
+      {"year": 1891, "temperature_anomaly": -0.22},
+      {"year": 1892, "temperature_anomaly": -0.27},
+      {"year": 1893, "temperature_anomaly": -0.31},
+      {"year": 1894, "temperature_anomaly": -0.30},
+      {"year": 1895, "temperature_anomaly": -0.20},
+      {"year": 1896, "temperature_anomaly": -0.11},
+      {"year": 1897, "temperature_anomaly": -0.11},
+      {"year": 1898, "temperature_anomaly": -0.27},
+      {"year": 1899, "temperature_anomaly": -0.16},
+      {"year": 1900, "temperature_anomaly": -0.09},
+      {"year": 1901, "temperature_anomaly": -0.15},
+      {"year": 1902, "temperature_anomaly": -0.27},
+      {"year": 1903, "temperature_anomaly": -0.35},
+      {"year": 1904, "temperature_anomaly": -0.44},
+      {"year": 1905, "temperature_anomaly": -0.28},
+      {"year": 1906, "temperature_anomaly": -0.22},
+      {"year": 1907, "temperature_anomaly": -0.40},
+      {"year": 1908, "temperature_anomaly": -0.43},
+      {"year": 1909, "temperature_anomaly": -0.47},
+      {"year": 1910, "temperature_anomaly": -0.43},
+      {"year": 1911, "temperature_anomaly": -0.44},
+      {"year": 1912, "temperature_anomaly": -0.35},
+      {"year": 1913, "temperature_anomaly": -0.34},
+      {"year": 1914, "temperature_anomaly": -0.15},
+      {"year": 1915, "temperature_anomaly": -0.10},
+      {"year": 1916, "temperature_anomaly": -0.34},
+      {"year": 1917, "temperature_anomaly": -0.44},
+      {"year": 1918, "temperature_anomaly": -0.28},
+      {"year": 1919, "temperature_anomaly": -0.25},
+      {"year": 1920, "temperature_anomaly": -0.26},
+  {"year": 1921, "temperature_anomaly": -0.14},
+  {"year": 1922, "temperature_anomaly": -0.20},
+  {"year": 1923, "temperature_anomaly": -0.22},
+  {"year": 1924, "temperature_anomaly": -0.27},
+  {"year": 1925, "temperature_anomaly": -0.16},
+  {"year": 1926, "temperature_anomaly": -0.10},
+  {"year": 1927, "temperature_anomaly": -0.20},
+  {"year": 1928, "temperature_anomaly": -0.19},
+  {"year": 1929, "temperature_anomaly": -0.36},
+  {"year": 1930, "temperature_anomaly": -0.14},
+  {"year": 1931, "temperature_anomaly": -0.10},
+  {"year": 1932, "temperature_anomaly": -0.17},
+  {"year": 1933, "temperature_anomaly": -0.27},
+  {"year": 1934, "temperature_anomaly": -0.14},
+  {"year": 1935, "temperature_anomaly": -0.20},
+  {"year": 1936, "temperature_anomaly": -0.12},
+  {"year": 1937, "temperature_anomaly": -0.03},
+  {"year": 1938, "temperature_anomaly": -0.03},
+  {"year": 1939, "temperature_anomaly": -0.01},
+  {"year": 1940, "temperature_anomaly": 0.08},
+  {"year": 1941, "temperature_anomaly": 0.12},
+  {"year": 1942, "temperature_anomaly": 0.10},
+  {"year": 1943, "temperature_anomaly": 0.10},
+  {"year": 1944, "temperature_anomaly": 0.19},
+  {"year": 1945, "temperature_anomaly": 0.12},
+  {"year": 1946, "temperature_anomaly": 0.00},
+  {"year": 1947, "temperature_anomaly": -0.01},
+  {"year": 1948, "temperature_anomaly": -0.01},
+  {"year": 1949, "temperature_anomaly": -0.01},
+  {"year": 1950, "temperature_anomaly": -0.17},
+  {"year": 1951, "temperature_anomaly": -0.07},
+  {"year": 1952, "temperature_anomaly": -0.02},
+  {"year": 1953, "temperature_anomaly": 0.09},
+  {"year": 1954, "temperature_anomaly": -0.13},
+  {"year": 1955, "temperature_anomaly": -0.15},
+  {"year": 1956, "temperature_anomaly": -0.20},
+  {"year": 1957, "temperature_anomaly": 0.04},
+  {"year": 1958, "temperature_anomaly": 0.07},
+  {"year": 1959, "temperature_anomaly": 0.03},
+  {"year": 1960, "temperature_anomaly": 0.02},
+  {"year": 1961, "temperature_anomaly": 0.05},
+  {"year": 1962, "temperature_anomaly": 0.02},
+  {"year": 1963, "temperature_anomaly": 0.06},
+  {"year": 1964, "temperature_anomaly": -0.20},
+  {"year": 1965, "temperature_anomaly": -0.14},
+  {"year": 1966, "temperature_anomaly": -0.08},
+  {"year": 1967, "temperature_anomaly": -0.02},
+  {"year": 1968, "temperature_anomaly": -0.08},
+  {"year": 1969, "temperature_anomaly": 0.05},
+  {"year": 1970, "temperature_anomaly": 0.02},
+  {"year": 1971, "temperature_anomaly": -0.09},
+  {"year": 1972, "temperature_anomaly": 0.01},
+  {"year": 1973, "temperature_anomaly": 0.15},
+  {"year": 1974, "temperature_anomaly": -0.07},
+  {"year": 1975, "temperature_anomaly": -0.01},
+  {"year": 1976, "temperature_anomaly": -0.12},
+  {"year": 1977, "temperature_anomaly": 0.18},
+  {"year": 1978, "temperature_anomaly": 0.07},
+  {"year": 1979, "temperature_anomaly": 0.17},
+  {"year": 1980, "temperature_anomaly": 0.27},
+  {"year": 1981, "temperature_anomaly": 0.32},
+  {"year": 1982, "temperature_anomaly": 0.14},
+  {"year": 1983, "temperature_anomaly": 0.30},
+  {"year": 1984, "temperature_anomaly": 0.16},
+  {"year": 1985, "temperature_anomaly": 0.12},
+  {"year": 1986, "temperature_anomaly": 0.19},
+  {"year": 1987, "temperature_anomaly": 0.33},
+  {"year": 1988, "temperature_anomaly": 0.38},
+  {"year": 1989, "temperature_anomaly": 0.29},
+  {"year": 1990, "temperature_anomaly": 0.43},
+  {"year": 1991, "temperature_anomaly": 0.40},
+  {"year": 1991, "temperature_anomaly": 0.40},
+  {"year": 1992, "temperature_anomaly": 0.23},
+  {"year": 1993, "temperature_anomaly": 0.24},
+  {"year": 1994, "temperature_anomaly": 0.32},
+  {"year": 1995, "temperature_anomaly": 0.38},
+  {"year": 1996, "temperature_anomaly": 0.32},
+  {"year": 1997, "temperature_anomaly": 0.42},
+  {"year": 1998, "temperature_anomaly": 0.63},
+  {"year": 1999, "temperature_anomaly": 0.42},
+  {"year": 2000, "temperature_anomaly": 0.42},
+  {"year": 2001, "temperature_anomaly": 0.54},
+  {"year": 2002, "temperature_anomaly": 0.63},
+  {"year": 2003, "temperature_anomaly": 0.62},
+  {"year": 2004, "temperature_anomaly": 0.54},
+  {"year": 2005, "temperature_anomaly": 0.67},
+  {"year": 2006, "temperature_anomaly": 0.63},
+  {"year": 2007, "temperature_anomaly": 0.66},
+  {"year": 2008, "temperature_anomaly": 0.54},
+  {"year": 2009, "temperature_anomaly": 0.64},
+  {"year": 2010, "temperature_anomaly": 0.70},
+  {"year": 2011, "temperature_anomaly": 0.58},
+  {"year": 2012, "temperature_anomaly": 0.63},
+  {"year": 2013, "temperature_anomaly": 0.67},
+  {"year": 2014, "temperature_anomaly": 0.74},
+  {"year": 2015, "temperature_anomaly": 0.87},
+  {"year": 2016, "temperature_anomaly": 0.99},
+  {"year": 2017, "temperature_anomaly": 0.91},
+  {"year": 2018, "temperature_anomaly": 0.85},
+  {"year": 2019, "temperature_anomaly": 0.98},
+  {"year": 2020, "temperature_anomaly": 0.98},
+  {"year": 2021, "temperature_anomaly": 0.85},
+  {"year": 2022, "temperature_anomaly": 0.98},
+  {"year": 2023, "temperature_anomaly": 1.17}
+    ];
+
+ 
+    // Extract years and anomalies
+    const years = temperatureData.map(d => d.year);
+    const anomalies = temperatureData.map(d => d.temperature_anomaly);
+
+    // Last data point for highlighting
+    const lastYear = temperatureData[temperatureData.length - 1].year;
+    const lastAnomaly = temperatureData[temperatureData.length - 1].temperature_anomaly;
+
+
+    // Function to calculate Lowess smoothing
+    function calculateLowess(x, y, bandwidth = 1.6) {
+      const smoothed = [];
+      const n = x.length;
+      for (let i = 0; i < n; i++) {
+        const weights = x.map(val => Math.exp(-Math.pow((x[i] - val) / bandwidth, 2)));
+        const sumWeights = weights.reduce((a, b) => a + b, 0);
+        const weightedMeanY = weights.reduce((sum, w, idx) => sum + w * y[idx], 0) / sumWeights;
+        smoothed.push(weightedMeanY);
+      }
+      return smoothed;
+    }
+
+    // Apply Lowess smoothing
+    const smoothedAnomalies = calculateLowess(years, anomalies);
+
+    // Plotly data
+    const data = [
+      {
+        x: years,
+        y: anomalies,
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'Annual Mean',
+        marker: { color: 'blue' },
+        line: { color: 'blue' }
+      },
+      {
+        x: years,
+        y: smoothedAnomalies,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Lowess Smoothing',
+        line: { color: 'black', width: 2 }
+      }
+      
+    ];
+
+
+    const layout = {
+      title: 'Global Land-Ocean Temperature Index',
+      xaxis: {
+        title: 'Year',
+        range: [1880, 2025] // Start from 1880
+      },
+      yaxis: { title: 'Temperature Anomaly (°C)' , fixedrange: true},
+      dragmode: 'zoom',
+      legend: {
+        x: 0,
+        y: 1,
+        bgcolor: 'rgba(255, 255, 255, 0.8)',
+        bordercolor: 'black',
+        borderwidth: 1
+      }
+    };
+
+    const config = {
+      responsive: true,
+      displayModeBar: false
+    };
+
+    // Render the graph
+    Plotly.newPlot('temperature-graph', data, layout, config);
+
+    
+    // Plotly.newPlot('temperature-graph', data, layout).then(() => {
+    //   // Access the pulsating dot element
+    //   const graphDiv = document.getElementById('temperature-graph');
+    //   const pulsatingDot = document.getElementById('pulsating-dot');
+
+    //   // Find the 2023 data point's position
+    //   const xValue = 2023;
+    //   const yValue = 1.17;
+
+    //   const pointIndex = years.indexOf(xValue);
+    //   Plotly.d3.select(graphDiv)
+    //     .select('.scatterlayer')
+    //     .selectAll('.point')
+    //     .each(function (_, i) {
+    //       // Match the correct point
+    //       if (i === pointIndex) {
+    //         const pointBB = this.getBoundingClientRect();
+    //         const graphBB = graphDiv.getBoundingClientRect();
+
+    //         // Calculate relative position
+    //         const dotX = pointBB.x - graphBB.x - 10; // Center the dot
+    //         const dotY = pointBB.y - graphBB.y - 10;
+
+    //         // Position and show the pulsating dot
+    //         pulsatingDot.style.left = `${dotX}px`;
+    //         pulsatingDot.style.top = `${dotY}px`;
+    //         pulsatingDot.style.display = 'block';
+    //       }
+    //     });
+    // });
+
+    // Render the graph
+    // Plotly.newPlot('temperature-graph', data, layout).then((graphDiv) => {
+    //   const pulsatingDot = document.getElementById('pulsating-dot');
+
+    //   // Find the 2023 data point's position
+    //   const xValue = 2023;
+    //   const yValue = 1.17;
+
+    //   const xaxis = graphDiv._fullLayout.xaxis; // Access x-axis details
+    //   const yaxis = graphDiv._fullLayout.yaxis; // Access y-axis details
+
+    //   // Convert data coordinates to pixel coordinates
+    //   const xPixel = xaxis.l2p(xValue) + graphDiv._fullLayout.margin.l;
+    //   const yPixel = yaxis.l2p(yValue) + graphDiv._fullLayout.margin.t;
+
+    //   // Position and show the pulsating dot
+    //   pulsatingDot.style.left = `${xPixel - 10}px`; // Adjust to center
+    //   pulsatingDot.style.top = `${yPixel - 10}px`; // Adjust to center
+    //   pulsatingDot.style.display = 'block';
+    // });
+
+    
+
+</script>
+
+</body>
+</html>
